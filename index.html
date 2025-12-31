@@ -1,3 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sewing Order Manager</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" class="login-box">
+  <h2>Order System Login</h2>
+  <input type="password" id="loginCode" placeholder="Enter access code">
+  <button onclick="login()">Login</button>
+  <p id="loginError" style="color:red;"></p>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" class="hidden">
+  <h1>Sewing Orders</h1>
+
+  <!-- Summary Bar -->
+  <div class="summary-bar">
+    <div>Total Badges Sewed: <span id="totalBadges">0</span></div>
+    <div>Total Payment Received: £<span id="totalPayment">0.00</span></div>
+    <div>Completed Orders: <span id="completedOrders">0</span></div>
+  </div>
+
+  <div class="top-bar filters">
+    <input type="text" id="searchInput" placeholder="Search name or badges">
+    <select id="statusFilter">
+      <option value="All">All Statuses</option>
+      <option value="Awaiting Drop-off">Awaiting Drop-off</option>
+      <option value="Ongoing">Ongoing</option>
+      <option value="Completed">Completed</option>
+    </select>
+    <button class="logout" onclick="logout()">Logout</button>
+  </div>
+
+  <div class="filters">
+    <button onclick="setPaymentFilter('All')">All Orders</button>
+    <button onclick="setPaymentFilter('No')">Unpaid</button>
+    <button onclick="setPaymentFilter('Yes')">Paid</button>
+  </div>
+
+  <!-- Order Form -->
+  <form id="orderForm">
+    <input type="text" id="name" placeholder="Customer Name" required>
+    <input type="number" id="badges" placeholder="Number of badges" required>
+    <input type="text" id="payment" placeholder="Minimum Payment (£)" readonly>
+    <input type="date" id="dropoff">
+    <input type="date" id="collection">
+    <select id="status">
+      <option value="Awaiting Drop-off">Awaiting Drop-off</option>
+      <option value="Ongoing">Ongoing</option>
+      <option value="Completed">Completed</option>
+    </select>
+    <select id="paid">
+      <option value="No">Payment Not Received</option>
+      <option value="Yes">Payment Received</option>
+    </select>
+    <button type="submit" class="save">Save Order</button>
+  </form>
+
+  <!-- Orders Table -->
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Badges</th>
+        <th>Min Payment</th>
+        <th>Drop-off</th>
+        <th>Collection</th>
+        <th>Status</th>
+        <th>Paid</th>
+      </tr>
+    </thead>
+    <tbody id="orderTable"></tbody>
+  </table>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
 
 
  
