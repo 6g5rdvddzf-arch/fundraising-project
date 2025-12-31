@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sewing Order Manager</title>
+<style>
+body { font-family: Arial, sans-serif; background: #f4f4f6; padding: 20px; }
+h1 { text-align:center; color:#4b2c6f; }
+.hidden { display:none; }
+
+.login-box { max-width:400px; margin:80px auto; background:white; padding:25px; border-radius:8px; text-align:center; }
+.login-box input, button { padding:10px; width:100%; margin-top:10px; }
+button { cursor:pointer; border:none; border-radius:6px; }
+button.save { background:#6b3fa0; color:white; padding:8px 12px; }
+.logout { background:#555; color:white; padding:6px 10px; border-radius:4px; }
+
+form { background:white; padding:15px; border-radius:8px; margin-bottom:15px; display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; }
+form input, form select, form button { padding:8px; }
+
+.filters { display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+
+.summary-bar { display:flex; justify-content:space-around; background:#e0e0e0; padding:10px; margin-bottom:10px; border-radius:8px; font-weight:bold; }
+
+table { width:100%; border-collapse:collapse; background:white; border-radius:8px; overflow:hidden; }
+th, td { padding:10px; border-bottom:1px solid #ddd; text-align:center; font-size:14px; }
+th { background:#6b3fa0; color:white; }
+td[contenteditable="true"] { background:#f9f9f9; }
+
+.status-awaiting { color:#b36b00; font-weight:bold; }
+.status-ongoing { color:#0066cc; font-weight:bold; }
+.status-completed { color:#2e8b57; font-weight:bold; }
+.unpaid { background:#ffe0e0; }
+.overdue { background:#ffd6d6; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen" class="login-box">
+<h2>Order System Login</h2>
+<input type="password" id="loginCode" placeholder="Enter access code">
+<button onclick="login()">Login</button>
+<p id="loginError" style="color:red;"></p>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" class="hidden">
+<h1>Sewing Orders</h1>
+
+<!-- Summary Bar -->
+<div class="summary-bar">
+  <div>Total Badges Sewed: <span id="totalBadges">0</span></div>
+  <div>Total Payment Received: £<span id="totalPayment">0.00</span></div>
+  <div>Completed Orders: <span id="completedOrders">0</span></div>
+</div>
+
+<div class="top-bar filters">
+  <input type="text" id="searchInput" placeholder="Search name or badges">
+  <select id="statusFilter">
+    <option value="All">All Statuses</option>
+    <option value="Awaiting Drop-off">Awaiting Drop-off</option>
+    <option value="Ongoing">Ongoing</option>
+    <option value="Completed">Completed</option>
+  </select>
+  <button class="logout" onclick="logout()">Logout</button>
+</div>
+
+<div class="filters">
+  <button onclick="setPaymentFilter('All')">All Orders</button>
+  <button onclick="setPaymentFilter('No')">Unpaid</button>
+  <button onclick="setPaymentFilter('Yes')">Paid</button>
+</div>
+
+<form id="orderForm">
+  <input type="text" id="name" placeholder="Customer Name" required>
+  <input type="number" id="badges" placeholder="Number of badges" required>
+  <input type="text" id="payment" placeholder="Minimum Payment (£)" readonly>
+  <input type="date" id="dropoff">
+  <input type="date" id="collection">
+  <select id="status">
+    <option value="Awaiting Drop-off">Awaiting Drop-off</option>
+    <option value="Ongoing">Ongoing</option>
+    <option value="Completed">Completed</option>
+  </select>
+  <select id="paid">
+    <option value="No">Payment Not Received</option>
+    <option value="Yes">Payment Received</option>
+  </select>
+  <button type="submit" class="save">Save Order</button>
+</form>
+
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Badges</th>
+<th>Min Payment</th>
+<th>Drop-off</th>
+<th>Collection</th>
+<th>Status</th>
+<th>Paid</th>
+</tr>
+</thead>
+<tbody id="orderTable"></tbody>
+</table>
+</div>
+
+<script>
+const ACCESS_CODE="WSJ2027";
+let editIndex=null;
+let paymentFilter="All";
+
+const loginScreen=document.getElementById("loginScreen");
+const app=document.getElementById("app");
+
+const totalBadgesEl=document.getElementById("totalBadges");
+const totalPaymentEl=document.getElementById("totalPayment");
+const completedOrdersEl=document.getElementById("completedOrders");
+
+function login(){
+  if(loginCode.value===ACCESS_CODE){
+    sessionStorage.setItem("loggedIn","true");
+    loginScreen.classList.add("hidden");
+    app.classList.remove("hidden");
+  } else { loginError.textContent="Incorrect code"; }
+}
+
+function logout(){
+  sessionStorage.clear();
+  location.reload();
+}
+
+if(sessionStorage.getItem("loggedIn")){
+  loginScreen.classList.add("hidden");
+  app.classList.remove("hidden");
+}
+
+const form=document.getElementById("orderForm");
+const table=document.getElementById("orderTable");
+const searchInput=document.getElementById("searchInput");
+const statusFilter=document.getElementById("statusFilter");
+
+let orders=JSON.parse(localStorage.getItem("sewingOrders"))||[];
+
+badges.addEventListener("input",()=>{
+  const count=badges.value||0;
+  payment.value=count?`£${(count*0.5).toFixed(2)}`:"";
+});
+
+function saveOrders(){ localStorage.setItem("sewingOrders",JSON.stringify(orders)); }
+
+function statusClass(s){ return s==="Awaiting Drop-off"?"status-awaiting":s==="Ongoing"?"status-ongoing":"status-completed"; }
+
+function setPaymentFilter(value){ paymentFilter=value; renderOrders(); }
+
+function renderOrders(){
+  table.innerHTML="";
+  let totalBadges=0;
+  let totalPayment=0;
+  let completedCount=0;
+  const today=new Date().toISOString().split("T")[0];
+
+  orders.forEach((o,i)=>{
+    if((statusFilter.value!=="All" && o.status!==statusFilter.value) ||
+       (paymentFilter!=="All" && o.paid!==paymentFilter) ||
+       (!o.name.toLowerCase().includes(searchInput.value.toLowerCase()) &&
+        !String(o.badges).includes(searchInput.value))) return;
+
+    const overdue=o.collection && o.collection<today && o.status!=="Completed";
+    const unpaid=o.paid==="No";
+
+    table.innerHTML+=`
+      <tr class="${overdue?"overdue":""} ${unpaid?"unpaid":""}">
+        <td contenteditable="true" onblur="updateOrder(${i},'name',this.textContent)">${o.name}</td>
+        <td contenteditable="true" onblur="updateOrder(${i},'badges',this.textContent);updatePayment(${i})">${o.badges}</td>
+        <td>£${(o.badges*0.5).toFixed(2)}</td>
+        <td contenteditable="true" onblur="updateOrder(${i},'dropoff',this.textContent)">${o.dropoff||""}</td>
+        <td contenteditable="true" onblur="updateOrder(${i},'collection',this.textContent)">${o.collection||""}</td>
+        <td contenteditable="true" onblur="updateOrder(${i},'status',this.textContent)">${o.status}</td>
+        <td contenteditable="true" onblur="updateOrder(${i},'paid',this.textContent)">${o.paid==="Yes"?"Yes":"No"}</td>
+      </tr>`;
+
+    // Update totals
+    totalBadges+=parseInt(o.badges)||0;
+    if(o.paid==="Yes") totalPayment+=(o.badges*0.5);
+    if(o.status==="Completed") completedCount++;
+  });
+
+  totalBadgesEl.textContent=totalBadges;
+  totalPaymentEl.textContent=totalPayment.toFixed(2);
+  completedOrdersEl.textContent=completedCount;
+}
+
+function updateOrder(i,field,value){
+  if(field==="badges") value=parseInt(value)||0;
+  orders[i][field]=value;
+  saveOrders();
+  renderOrders();
+}
+
+function updatePayment(i){
+  orders[i].payment=`£${(orders[i].badges*0.5).toFixed(2)}`;
+  saveOrders();
+  renderOrders();
+}
+
+form.addEventListener("submit",e=>{
+  e.preventDefault();
+  const order={
+    name:name.value,
+    badges:parseInt(badges.value)||0,
+    payment:`£${(badges.value*0.5).toFixed(2)}`,
+    dropoff:dropoff.value,
+    collection:collection.value,
+    status:status.value,
+    paid:paid.value
+  };
+  if(editIndex!==null){ orders[editIndex]=order; editIndex=null; } else { orders.push(order); }
+  saveOrders(); form.reset(); renderOrders();
+});
+
+searchInput.addEventListener("input", renderOrders);
+statusFilter.addEventListener("change", renderOrders);
+
+renderOrders();
+</script>
+</body>
+</html>
